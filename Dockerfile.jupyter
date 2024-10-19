@@ -1,0 +1,24 @@
+FROM nvidia/cuda:12.4.1-cudnn-devel-ubuntu22.04
+
+WORKDIR /app
+
+RUN apt update && \
+    apt install -y  \
+    python3 \
+    python3.10-venv
+
+SHELL ["/bin/bash", "-c"]
+
+RUN python3 -m venv ./venv && \
+    source ./venv/bin/activate && \
+    python -m pip install \
+    jupyter \
+    transformers \
+    torch
+
+ENTRYPOINT /app/venv/bin/jupyter \
+    notebook \
+    --allow-root \
+    --ip "0.0.0.0" \
+    --port ${PORT} \
+    --IdentityProvider.token=${TOKEN}

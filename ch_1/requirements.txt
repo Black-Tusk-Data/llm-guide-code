@@ -1,0 +1,6 @@
+btdcore==0.1.1
+expert-kb==0.1.1
+expert-cli==0.1.0
+expert-doc==0.1.1
+expert-llm==0.1.1
+tqdm==4.66.4
