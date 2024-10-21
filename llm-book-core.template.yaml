@@ -1,0 +1,129 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: |
+  LLM Book Core Infrastructure Stack.
+  Define network components, security groups, roles and policies
+
+Parameters:
+  Application:
+    Type: "String"
+    Default: "llm-book"
+
+  Component:
+    Type: "String"
+    Default: "core"
+
+  CidrAll:
+    Type: "String"
+    Default: "0.0.0.0/0"
+
+
+Resources:
+  # Network
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: "10.0.0.0/16"
+      EnableDnsSupport: True
+      EnableDnsHostnames: True
+
+  PublicSubnetA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !Select
+        - 0
+        - !GetAZs
+          Ref: AWS::Region
+      VpcId: !Ref VPC
+      CidrBlock: "10.0.0.0/24"
+      MapPublicIpOnLaunch: true
+
+  PublicSubnetB:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !Select
+        - 1
+        - !GetAZs
+          Ref: AWS::Region
+      VpcId: !Ref VPC
+      CidrBlock: "10.0.1.0/24"
+      MapPublicIpOnLaunch: true
+
+  # public routing
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+
+  GatewayAttachement:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref VPC
+      InternetGatewayId: !Ref InternetGateway
+
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+
+  PublicRouteTableAllNonLocalToIG:
+    Type: AWS::EC2::Route
+    DependsOn: GatewayAttachement
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: !Ref CidrAll
+      GatewayId: !Ref InternetGateway
+
+  PublicSubnetARouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnetA
+      RouteTableId: !Ref PublicRouteTable
+
+  PublicSubnetBRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnetB
+      RouteTableId: !Ref PublicRouteTable
+
+  # # security groups
+  JupyterSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: !Join ['-', [!Ref Component, "JupyterSecurityGroup"]]
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 0
+          ToPort: 65535
+          CidrIp: 0.0.0.0/0
+
+  LogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: "llm-machine-output"
+
+
+Outputs:
+  VpcId:
+    Description: VPC ID
+    Value: !Ref VPC
+    Export:
+      Name: LlmInfraVpc
+  PublicSubnetA:
+    Description: "Public Subnet A"
+    Value: !Ref PublicSubnetA
+    Export:
+      Name: LlmInfraPublicSubnetA
+  PublicSubnetB:
+    Description: "Public Subnet B"
+    Value: !Ref PublicSubnetB
+    Export:
+      Name: LlmInfraPublicSubnetB
+  JupyterSecurityGroupArn:
+    Description: "Security Group for load balancer"
+    Value: !Ref JupyterSecurityGroup
+    Export:
+      Name: JupyterSecurityGroupArn
+  LogGroup:
+    Description: "Llm Machine Log Groups"
+    Value: !Ref LogGroup
+    Export:
+      Name: LlmLogGroup

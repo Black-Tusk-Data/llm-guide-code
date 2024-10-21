@@ -5,7 +5,9 @@ WORKDIR /app
 RUN apt update && \
     apt install -y  \
     python3 \
-    python3.10-venv
+    python3.10-venv \
+    python3.10-dev \
+    git
 
 SHELL ["/bin/bash", "-c"]
 
@@ -14,7 +16,12 @@ RUN python3 -m venv ./venv && \
     python -m pip install \
     jupyter \
     transformers \
-    torch
+    torch \
+    wheel \
+    packaging \
+    accelerate \
+    && MAX_JOBS=4 python -m pip install flash-attn --no-build-isolation
+
 
 ENTRYPOINT /app/venv/bin/jupyter \
     notebook \

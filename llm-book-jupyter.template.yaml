@@ -1,0 +1,85 @@
+# TODO: use the S3 bucket as a cache for a zipped venv with the bundle in its name.
+AWSTemplateFormatVersion: 2010-09-09
+Description: |
+  LLM Book Jupyter Host
+
+Parameters:
+  Application:
+    Type: 'String'
+    Default: 'llm-book'
+
+  Component:
+    Type: 'String'
+    Default: 'jupyter-notebook'
+
+  NotebookToken:
+    Type: 'String'
+
+Resources:
+  EC2Role:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - 'ec2.amazonaws.com'
+            Action: 'sts:AssumeRole'
+      Path: '/'
+      Policies:
+        - PolicyName: 'ecs-service'
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 'logs:CreateLogStream'
+                  - 'logs:PutLogEvents'
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - 'dynamodb:*'
+                Resource:
+                  - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/cloud-computer-state"
+              - Effect: Allow
+                Action:
+                  - 's3:*'
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - 'states:*'
+                Resource: '*'
+  EC2InstanceProfile:
+    Type: 'AWS::IAM::InstanceProfile'
+    Properties:
+      Roles:
+        - !Ref EC2Role
+
+  Ec2Instance:
+    Type: AWS::EC2::Instance
+    Properties:
+      AvailabilityZone: us-east-2a
+      InstanceType: 'g5.xlarge'
+      ImageId: "ami-00614abc48e7227ee" # custom
+      KeyName: "llm-book"
+      BlockDeviceMappings:
+        - DeviceName: /dev/sda1
+          Ebs:
+            VolumeSize: 100
+      SubnetId: !ImportValue LlmInfraPublicSubnetA
+      IamInstanceProfile: !Ref EC2InstanceProfile
+      SecurityGroupIds:
+        - !ImportValue JupyterSecurityGroupArn
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          cd /home/ubuntu
+          source ./venv/bin/activate
+          python -m jupyter notebook --IdentityProvider.token=${NotebookToken} --allow-root .
+
+
+Outputs:
+  PublicIp:
+    Value: !GetAtt Ec2Instance.PublicIp
